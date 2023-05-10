@@ -10,11 +10,10 @@ RUN apt-get install --no-install-recommends -y \
 
 RUN ln -sf /usr/lib/apache2/modules/mod_auth_openidc.so /usr/local/apache2/modules/mod_auth_openidc.so
 
-RUN pip install poetry
-
 COPY . /usr/local/forevd
 WORKDIR /usr/local/forevd
 
+RUN pip install poetry
 RUN poetry install
 RUN poetry build
 RUN pip install --verbose dist/forevd-*.whl
