@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "forevd"
-version = "0.1.1"
+version = "0.1.2"
 description = "Forward and reverse proxy using nginx or apache"
 authors = ["Erick Bourgeois <erick@jeb.ca>"]
 license = "LICENSE"
