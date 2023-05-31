@@ -29,13 +29,16 @@ def _setup_logging(debug):
         logging.getLogger("forevd").setLevel(logging.DEBUG)
 
 
-def _nomalize_locations(locations: list, backend: str, location: str, mtls: bool):
+def _nomalize_locations(
+    locations: dict, backend: str, location: str, mtls: bool, http_methods: list
+):
     if not locations:
         locations = {}
 
     loc_struct = locations.get(location, {})
     loc_struct["backend"] = backend
     loc_struct["mtls"] = mtls
+    loc_struct["http_methods"] = http_methods
 
     locations[location] = loc_struct
 
@@ -98,8 +101,18 @@ def _nomalize_locations(locations: list, backend: str, location: str, mtls: bool
     show_default=True,
 )
 @click.option(
+    "--http-methods",
+    help="Restrict HTTP method calls for the supplied list ",
+    type=cli.StrList,
+)
+@click.option(
+    "--ldap",
+    help="Provide the LDAP config in a JSON or YAML string or file",
+    type=cli.FromJsonOrYaml(),
+)
+@click.option(
     "--listen",
-    help="The ip/hostname and port to listen on",
+    help="The IP/hostname and port to listen on",
     type=str,
     default=_DEFAULT_LISTEN,
     show_default=True,
@@ -111,13 +124,13 @@ def _nomalize_locations(locations: list, backend: str, location: str, mtls: bool
 )
 @click.option(
     "--locations",
-    help="Provide a json string or file with location details",
+    help="Provide the Location config in a JSON or YAML string or file",
     type=cli.FromJsonOrYaml(),
 )
 @click.option("--mtls", help="Enable mutual TLS", type=click.Choice(["optional", "require"]))
 @click.option(
     "--oidc",
-    help="Provide the OIDC config in a json string; e.g. `provider_metada_url`",
+    help="Provide the OIDC config in a JSON or YAML string or file",
     type=cli.FromJsonOrYaml(),
 )
 @click.option(
@@ -147,6 +160,8 @@ def main(
     debug,
     err_log,
     do_exec,
+    http_methods,
+    ldap,
     listen,
     location,
     locations,
@@ -155,9 +170,7 @@ def main(
     server_name,
     var_dir,
 ):
-    """forevd is a forward/reverse proxy, primarily used as a sidecar for REST or any HTTP/s
-    applications.
-    """
+    """forevd is a forward/reverse proxy, primarily used as a sidecar for REST or any HTTP/s apps."""
     _setup_logging(debug)
 
     if not backend and location and not locations:
@@ -170,7 +183,8 @@ def main(
         "cert": cert,
         "cert_key": cert_key,
         "debug": debug,
-        "locations": _nomalize_locations(locations, backend, location, mtls),
+        "ldap": ldap,
+        "locations": _nomalize_locations(locations, backend, location, mtls, http_methods),
         "listen": listen,
         "oidc": oidc,
         "server_name": server_name,

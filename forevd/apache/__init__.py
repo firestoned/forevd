@@ -18,6 +18,7 @@ def run(var_dir: str, config: dict, do_exec: bool, cmd: str = None):
     jinja_env = jinja2.Environment(
         loader=jinja2.PackageLoader("forevd", "apache"), autoescape=jinja2.select_autoescape()
     )
+    jinja_env.add_extension("jinja2.ext.do")
 
     template = jinja_env.get_template("httpd.conf")
 

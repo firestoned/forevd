@@ -1,0 +1,5 @@
+SharedCacheSize: 500000
+CacheEntries: 1024
+CacheTTL: 600
+OpCacheEntries: 1024
+OpCacheTTL: 600

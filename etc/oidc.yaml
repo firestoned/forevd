@@ -1,0 +1,7 @@
+ProviderMetadataUrl: "https://{{ OIDC_PROVIDER_NAME }}.us.auth0.com/.well-known/openid-configuration"
+RedirectURI: "https://erick-pro.jeb.ca:8080/secure/redirect_uri"
+ClientId: "{{ OIDC_CLIENT_ID }}"
+ClientSecret: "{{ OIDC_CLIENT_SECRET }}"
+Scope: '"openid profile"'
+PKCEMethod: S256
+RemoteUserClaim: nickname
