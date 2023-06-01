@@ -1,11 +1,11 @@
 # Table of contents
 1. [Intro](#intro)
-2. [Dependencies](#deps)
-3. [Running `forevd`](#running)
-    1. [Config Files](#config)
-    2. [Mutual TLS](#mtls)
+2. [Dependencies](#dependencies)
+3. [Running `forevd`](#running-forevd)
+    1. [Config Files](#config-files)
+    2. [Mutual TLS](#mutual-tls)
 
-# <a name="intro" />Intro
+# Intro
 
 `forevd` is a forward and reverse proxy that helps deliver authentication and, optionally,
 authorization as a sidecar.
@@ -13,7 +13,7 @@ authorization as a sidecar.
 This project was created to help eliminate any need to add authentication into your application
 code.
 
-# <a name="deps" />Dependencies
+# Dependencies
 
 At the moment, `forevd`, runs using Apache, so you will need to have httpd or docker image of it
 available at runtime.
@@ -21,14 +21,14 @@ available at runtime.
 - Apache
 - nginx (TBD)
 
-# <a name="running" />Running `forevd`
+# Running `forevd`
 
 The following proivides some details on how to run `forevd`. The way the options work are that
 anything provided immediately on the CLI, are "global" defaults; if you then provide config
 (optionally files), via the `--locations`, `--ldap` or `--oidc` options, then those will override
 the CLI options, of, e.g. `--backend` and `--location`
 
-## <a name="config" />Config Files
+## Config Files
 
 You can optionally provide config files for more complicated setups; this section provides soem
 examples, which can be found in the `etc` directory.
@@ -105,7 +105,7 @@ OpCacheEntries: 1024
 OpCacheTTL: 600
 ```
 
-## <a name="mtls" />Mutual TLS
+## Mutual TLS
 
 The following command provides termination of mTLS on `/` and redirects connections to a backend at
 `http://localhost:8081`
@@ -122,6 +122,10 @@ forevd --debug --listen 0.0.0.0:8080 \
     --var-dir /var/tmp/apache
 ```
 
-## <a name="mtls" />Authorization
+## Authorization
 
 To add authorization, it's recommended you use a config file for the `--locations` command line.
+
+There is currently support for LDAP group lookup and static user names.
+
+See [Locations Example](#example) for more detail.

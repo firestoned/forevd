@@ -35,12 +35,22 @@ def _nomalize_locations(
     if not locations:
         locations = {}
 
-    loc_struct = locations.get(location, {})
-    loc_struct["backend"] = backend
-    loc_struct["mtls"] = mtls
-    loc_struct["http_methods"] = http_methods
+    endpoints = list(locations.keys())
+    if location:
+        endpoints.insert(0, location)
+    _LOGGER.debug(f"endpoints: {endpoints}")
 
-    locations[location] = loc_struct
+    for endpoint in endpoints:
+        config = locations[endpoint]
+        if "backend" not in config:
+            config["backend"] = backend
+        if "mtls" not in config:
+            config["mtls"] = mtls
+        if "http_methods" not in config:
+            config["http_methods"] = http_methods
+
+        locations[endpoint] = config
+    _LOGGER.debug(f"locations: {locations}")
 
     return locations
 
@@ -173,8 +183,11 @@ def main(
     """forevd is a forward/reverse proxy, primarily used as a sidecar for REST or any HTTP/s apps."""
     _setup_logging(debug)
 
-    if not backend and location and not locations:
+    if (not backend or not location) and not locations:
         raise click.UsageError("You must supply a --backend and --location or --locations")
+
+    if mtls and not cert:
+        raise click.UsageError("You must provide --cert and --cert-key, for mTLS support.")
 
     config = {
         "err_log": err_log,

@@ -1,4 +1,5 @@
 /:
+  backend: "http://host.docker.internal:8081/"
   authz:
     join_type: "any"
     ldap:
