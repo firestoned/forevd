@@ -29,19 +29,35 @@ def _setup_logging(debug):
         logging.getLogger("forevd").setLevel(logging.DEBUG)
 
 
+def _get_loc_by_path(locations, path):
+    for config in locations:
+        if "path" not in config:
+            raise click.UsageError("Locations must contain a path")
+        if config["path"] == path:
+            return config
+
+    return None
+
+
 def _nomalize_locations(
     locations: dict, backend: str, location: str, mtls: bool, http_methods: list
 ):
     if not locations:
-        locations = {}
+        locations = []
 
-    endpoints = list(locations.keys())
-    if location:
-        endpoints.insert(0, location)
+    endpoints = [conf["path"] for conf in locations]
+
+    missing_cli_loc = False
+    if location and location not in endpoints:
+        endpoints.append(location)
+        missing_cli_loc = True
     _LOGGER.debug(f"endpoints: {endpoints}")
 
     for endpoint in endpoints:
-        config = locations[endpoint]
+        config = _get_loc_by_path(locations, endpoint)
+        if not config:
+            config = {"path": endpoint}
+
         if "backend" not in config:
             config["backend"] = backend
         if "mtls" not in config:
@@ -49,7 +65,9 @@ def _nomalize_locations(
         if "http_methods" not in config:
             config["http_methods"] = http_methods
 
-        locations[endpoint] = config
+        if missing_cli_loc:
+            locations.append(config)
+
     _LOGGER.debug(f"locations: {locations}")
 
     return locations
@@ -116,6 +134,11 @@ def _nomalize_locations(
     type=cli.StrList,
 )
 @click.option(
+    "--httpd-include",
+    help="Add your own config from a file into the generated httpd.conf",
+    type=cli.FromJsonOrYaml(),
+)
+@click.option(
     "--ldap",
     help="Provide the LDAP config in a JSON or YAML string or file",
     type=cli.FromJsonOrYaml(),
@@ -171,6 +194,7 @@ def main(
     err_log,
     do_exec,
     http_methods,
+    httpd_include,
     ldap,
     listen,
     location,
@@ -195,6 +219,7 @@ def main(
         "ca_cert": ca_cert,
         "cert": cert,
         "cert_key": cert_key,
+        "httpd_include": httpd_include,
         "debug": debug,
         "ldap": ldap,
         "locations": _nomalize_locations(locations, backend, location, mtls, http_methods),

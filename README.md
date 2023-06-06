@@ -51,7 +51,7 @@ format of the file is a dictionary of locations, or endpoints, and their corresp
 The following adds LDAP group **and** static user authorization to `/`
 
 ```yaml
-/:
+- path: /
   authz:
     join_type: "any"
     ldap:
@@ -107,8 +107,8 @@ OpCacheTTL: 600
 
 ## Mutual TLS
 
-The following command provides termination of mTLS on `/` and redirects connections to a backend at
-`http://localhost:8081`
+The following command provides termination of mTLS on `/` and passes connections to a backend at
+`http://0.0.0.0:8080`
 
 ```
 forevd --debug --listen 0.0.0.0:8080 \
