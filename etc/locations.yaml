@@ -1,5 +1,7 @@
-/:
+- path: /
   backend: "http://host.docker.internal:8081/"
+  include: |
+    # Testing includes for adhoc Apache config
   authz:
     join_type: "any"
     ldap:
