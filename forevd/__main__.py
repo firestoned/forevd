@@ -40,7 +40,12 @@ def _get_loc_by_path(locations, path):
 
 
 def _nomalize_locations(
-    locations: dict, backend: str, location: str, mtls: bool, http_methods: list
+    locations: dict,
+    backend: str,
+    location: str,
+    mtls: bool,
+    http_methods: list,
+    set_access_token: bool,
 ):
     if not locations:
         locations = []
@@ -64,6 +69,8 @@ def _nomalize_locations(
             config["mtls"] = mtls
         if "http_methods" not in config:
             config["http_methods"] = http_methods
+        if "set_access_token" not in config:
+            config["set_access_token"] = set_access_token
 
         if missing_cli_loc:
             locations.append(config)
@@ -175,6 +182,13 @@ def _nomalize_locations(
     envvar="FOREVD_HOSTNAME",
 )
 @click.option(
+    "--set-access-token/--no-set-access-token",
+    "set_access_token",
+    help="Set the access token",
+    is_flag=True,
+    default=True,
+)
+@click.option(
     "--var-dir",
     help="The backend of this reverse proxy will front, e.g. http://localhost:8080/foo",
     type=click.Path(),
@@ -202,6 +216,7 @@ def main(
     mtls,
     oidc,
     server_name,
+    set_access_token,
     var_dir,
 ):
     """forevd is a forward/reverse proxy, primarily used as a sidecar for REST or any HTTP/s apps."""
@@ -222,7 +237,9 @@ def main(
         "httpd_include": httpd_include,
         "debug": debug,
         "ldap": ldap,
-        "locations": _nomalize_locations(locations, backend, location, mtls, http_methods),
+        "locations": _nomalize_locations(
+            locations, backend, location, mtls, http_methods, set_access_token
+        ),
         "listen": listen,
         "oidc": oidc,
         "server_name": server_name,
