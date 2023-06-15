@@ -1,9 +1,12 @@
 # Table of contents
 1. [Intro](#intro)
-2. [Dependencies](#dependencies)
-3. [Running `forevd`](#running-forevd)
-    1. [Config Files](#config-files)
-    2. [Mutual TLS](#mutual-tls)
+1. [Dependencies](#dependencies)
+1. [Running `forevd`](#running-forevd)
+1. [Config Files](#config-files)
+    1. [OIDC Config](#oidc-config)
+    1. [LDAP](#ldap-config)
+1. [Mutual TLS](#mutual-tls)
+1. [Authorization](#authorization)
 
 # Intro
 
@@ -23,12 +26,12 @@ available at runtime.
 
 # Running `forevd`
 
-The following proivides some details on how to run `forevd`. The way the options work are that
+The following proivides some details on how to run `forevd`. The way the options work is that
 anything provided immediately on the CLI, are "global" defaults; if you then provide config
 (optionally files), via the `--locations`, `--ldap` or `--oidc` options, then those will override
-the CLI options, of, e.g. `--backend` and `--location`
+the CLI options, of, e.g. `--backend` and `--location`.
 
-## Config Files
+# Config Files
 
 You can optionally provide config files for more complicated setups; this section provides soem
 examples, which can be found in the `etc` directory.
@@ -40,13 +43,34 @@ runtime.
 The following command line options support files: `--locations`, `--ldap` or `--oidc`, via the `@`
 symbol, similar to `curl`'s command line option `--data`, for example, `--oidc @etc/oidc.yaml`
 
-### Locations Config
+## Locations Config
 
 This config allows you to provide much more control over each "location" or "endpoint" to your
 reverse proxy. For example, using different backends for different URLs or adding authorization. The
 format of the file is a dictionary of locations, or endpoints, and their correspondign data.
 
-#### Example
+### Keys
+
+There are 5 key config options for each location:
+
+1. `path`: the path, location or endpoint of what to protect or unprotect
+1. `match`: whether the path value is a regex or *match*
+1. `authc`: this is the authentication (aka `authc`) key, representing what authc to enable; this is
+   dictionary with keys being either `mtls` or `oidc`.
+1. `authz`: this is the authorization (aka `authz`) key, representing what authz to enable; this is
+   dictionary with keys, see below example and details at the [Authorization](#authorization)
+    section.
+
+Note: remember that global authentication options `--oidc` and `mtls`, so if you want to set OIDC
+across all endpoints, except, say, `/api`, you would need to disable it explicitly with:
+
+```yaml
+- path: /api
+  authc:
+    oidc: false
+```
+
+### Example
 
 The following adds LDAP group **and** static user authorization to `/`
 
@@ -73,12 +97,12 @@ Let's break this down a bit:
   - `any`: if any of the authorization types match, allow connection through
   - `all`: all of the authorization types **must** match to allow connection through
 
-### OIDC Config
+## OIDC Config
 
 This is useful for adding any other global OIDC config; there are required fields for the auth to
 work, e.g. `ClientID` and `ClientSecret`.
 
-#### Example
+### Example
 
 ```yaml
 ProviderMetadataUrl: "https://{{ OIDC_PROVIDER_NAME }}.us.auth0.com/.well-known/openid-configuration"
@@ -90,12 +114,12 @@ PKCEMethod: S256
 RemoteUserClaim: nickname
 ```
 
-### LDAP Config
+## LDAP Config
 
 This is used for global LDAP config, e.g. setting cache information for `mod_ldap`. Note: The `LDAP`
 prefix is stripped, as it's redundant and it's added as part of the config generation.
 
-#### Example
+### Example
 
 ```yaml
 SharedCacheSize: 500000
@@ -105,7 +129,7 @@ OpCacheEntries: 1024
 OpCacheTTL: 600
 ```
 
-## Mutual TLS
+# Mutual TLS
 
 The following command provides termination of mTLS on `/` and passes connections to a backend at
 `http://0.0.0.0:8080`
@@ -122,10 +146,22 @@ forevd --debug --listen 0.0.0.0:8080 \
     --var-dir /var/tmp/apache
 ```
 
-## Authorization
+# Authorization
 
 To add authorization, it's recommended you use a config file for the `--locations` command line.
 
-There is currently support for LDAP group lookup and static user names.
+There is currently support for LDAP group lookups, static user names, or allow all valid users. Here
+are the keys supported:
+
+1. `allow_all`: this key let's `forevd` know to allow all valid users through
+1. `join_type`: this is the "join" type between all authorizations setup
+  - `any`: if any of the authorization types match, allow connection through
+  - `all`: all of the authorization types **must** match to allow connection through
+1. `ldap`: this is the LDAP configuration for group lookups, keys are:
+   - `url`: LDAP URL, e.g. `ldaps://127.0.0.1/DC=foo,DC=example,DC=com`
+   - `bind-dn`: the DN for bind operation
+   - `bind-pw`: the password for bind operation
+   - `groups`: a list of groups DNs
+1. `users`: a list of user names to verify against
 
 See [Locations Example](#example) for more detail.
