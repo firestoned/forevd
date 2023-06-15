@@ -43,6 +43,7 @@ def _nomalize_locations(
     locations: dict,
     backend: str,
     location: str,
+    oidc: bool,
     mtls: bool,
     http_methods: list,
     set_access_token: bool,
@@ -62,16 +63,24 @@ def _nomalize_locations(
         config = _get_loc_by_path(locations, endpoint)
         if not config:
             config = {"path": endpoint}
+        authc = config.get("authc", {})
+        authz = config.get("authz", {})
+
+        if "allow_all" in authz and "join_type" in authz:
+            raise click.UsageError("Locations must contain a path")
 
         if "backend" not in config:
             config["backend"] = backend
-        if "mtls" not in config:
-            config["mtls"] = mtls
+        if mtls and "mtls" not in authc:
+            authc["mtls"] = mtls
+        if oidc and "oidc" not in authc:
+            authc["oidc"] = oidc
         if "http_methods" not in config:
             config["http_methods"] = http_methods
         if "set_access_token" not in config:
             config["set_access_token"] = set_access_token
 
+        config["authc"] = authc
         if missing_cli_loc:
             locations.append(config)
 
@@ -238,7 +247,7 @@ def main(
         "debug": debug,
         "ldap": ldap,
         "locations": _nomalize_locations(
-            locations, backend, location, mtls, http_methods, set_access_token
+            locations, backend, location, oidc, mtls, http_methods, set_access_token
         ),
         "listen": listen,
         "oidc": oidc,

@@ -1,14 +1,21 @@
+- path: /api
+  backend: "http://host.docker.internal:8081/api"
+  authc:
+    mtls: require
+    oidc: false
+  authz:
+    allow_all: true
 - path: /
   backend: "http://host.docker.internal:8081/"
   include: |
-    # Testing includes for adhoc Apache config
+    # Testing includes for ad-hoc Apache config
   authz:
-    join_type: "any"
-    ldap:
-      url: "ldaps://127.0.0.1/DC=foo,DC=example,DC=com"
-      bind-dn: "foo"
-      bind-pw: "{{ LDAP_BINDID_PASSWORD }}"
-      groups:
-        - "CN=foobar,OU=groups,DC=example,DC=com"
-    users:
-      - erick.bourgeois
+   join_type: "any"
+   ldap:
+     url: "ldaps://127.0.0.1/DC=foo,DC=example,DC=com"
+     bind-dn: "foo"
+     bind-pw: "{{ LDAP_BINDID_PASSWORD }}"
+     groups:
+       - "CN=foobar,OU=groups,DC=example,DC=com"
+   users:
+     - erick.bourgeois
