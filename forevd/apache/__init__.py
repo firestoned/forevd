@@ -1,6 +1,7 @@
 """
 Resources module ot help load templates in
 """
+
 import io
 import logging
 import os
