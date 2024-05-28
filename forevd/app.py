@@ -10,5 +10,5 @@ APP = fastapi.FastAPI()
 
 @APP.get("/")
 def root(request: fastapi.Request):
-    """Simple WEB example that outputs the headers recieved."""
+    """Simple WEB example that outputs the headers received."""
     return request.headers

@@ -153,7 +153,7 @@ def _nomalize_locations(
 @click.option(
     "--httpd-include",
     help="Add your own config from a file into the generated httpd.conf",
-    type=cli.FromJsonOrYaml(),
+    type=cli.SlurpStrOrFile(),
 )
 @click.option(
     "--ldap",
@@ -199,6 +199,11 @@ def _nomalize_locations(
     default=True,
 )
 @click.option(
+    "--ssl",
+    help="Provide the SSL config in a JSON or YAML string or file",
+    type=cli.FromJsonOrYaml(),
+)
+@click.option(
     "--var-dir",
     help="The backend of this reverse proxy will front, e.g. http://localhost:8080/foo",
     type=click.Path(),
@@ -227,6 +232,7 @@ def main(
     oidc,
     server_name,
     set_access_token,
+    ssl,
     var_dir,
 ):
     """forevd is a forward/reverse proxy, primarily used as a sidecar for REST or any HTTP/s apps."""
@@ -252,6 +258,7 @@ def main(
         ),
         "listen": listen,
         "oidc": oidc,
+        "ssl": ssl,
         "server_name": server_name,
     }
     _LOGGER.debug(f"config: {config}")
