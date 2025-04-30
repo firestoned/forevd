@@ -22,6 +22,7 @@ _DEFAULT_VAR_DIR = os.path.join(tempfile.mkdtemp(), "forevd")
 _LOGGER = logging.getLogger(__name__)
 
 
+# pylint: disable=too-many-positional-arguments
 def _setup_logging(debug):
     cli.init_logging("forevd.resources.logging", "cli.conf")
 
