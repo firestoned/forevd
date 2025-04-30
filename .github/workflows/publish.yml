@@ -25,9 +25,18 @@ jobs:
       with:
         python-version: '3.x'
     - name: Install dependencies
+      env:
+        VERSION: ${{ github.ref_name }}
       run: |
         python -m pip install --upgrade pip
         python -m pip install poetry
+
+        TEMPFILE=$(mktemp)
+
+        cat pyproject.toml | sed "s/^version = \".*\"/version = \"$VERSION\"/" > $TEMPFILE
+        mv $TEMPFILE pyproject.toml
+
+        poetry lock
         poetry install
     - name: Build package
       run: poetry build
