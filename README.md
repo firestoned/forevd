@@ -1,68 +1,89 @@
-# Table of contents
+# forevd
+
+`forevd` is a forward and reverse proxy sidecar that centralizes authentication (mTLS, OIDC) and optional authorization so application services can stay auth-agnostic.
+
+## Table of contents
+1. [Firestone Ecosystem](#firestone-ecosystem)
 1. [Intro](#intro)
-1. [Dependencies](#dependencies)
+1. [Requirements](#requirements)
+1. [Quick Start](#quick-start)
 1. [Running `forevd`](#running-forevd)
 1. [Config Files](#config-files)
+    1. [Locations Config](#locations-config)
     1. [OIDC Config](#oidc-config)
-    1. [LDAP](#ldap-config)
+    1. [LDAP Config](#ldap-config)
 1. [Mutual TLS](#mutual-tls)
 1. [Authorization](#authorization)
+1. [Logging & Debugging](#logging--debugging)
+1. [Project Structure](#project-structure)
+1. [Contributing & Testing](#contributing--testing)
+1. [License](#license)
 
-# Intro
+## Firestone Ecosystem
 
-`forevd` is a forward and reverse proxy that helps deliver authentication and, optionally,
-authorization as a sidecar.
+Forevd shares a codebase lineage with sibling projects maintained under the Firestone umbrella:
 
-This project was created to help eliminate any need to add authentication into your application
-code.
+- [`firestone`](https://github.com/firestoned/firestone) is the spec generator that turns JSON Schema resources into OpenAPI/AsyncAPI documents and templated CLIs.
+- [`firestone-lib`](https://github.com/firestoned/firestone-lib) provides the Click parameter types, schema loaders, and logging helpers that both Firestone and Forevd build on.
 
-# Dependencies
+## Intro
 
-At the moment, `forevd`, runs using Apache, so you will need to have httpd or docker image of it
-available at runtime.
+`forevd` runs Apache HTTPD on your behalf, renders the necessary config from structured input, and launches it in the foreground. You supply backends, authentication knobs, and authorization rules via CLI flags or YAML files; `forevd` turns that into a working proxy that injects the right headers for downstream apps.
 
-- Apache
-- nginx (TBD)
+## Requirements
 
-# Running `forevd`
+- Python **3.9 – <4.0** (as declared in `pyproject.toml`)
+- [Poetry](https://python-poetry.org/) for dependency management
+- Apache HTTP Server **2.4+** available in `$PATH` or provided via `--cmd`
+- (Optional) Docker image of httpd if you prefer containerized execution
+- FastAPI/uvicorn only power the sample echo app used for smoke tests
+- nginx support is planned but not yet implemented
 
-The following proivides some details on how to run `forevd`. The way the options work is that
-anything provided immediately on the CLI, are "global" defaults; if you then provide config
-(optionally files), via the `--locations`, `--ldap` or `--oidc` options, then those will override
-the CLI options, of, e.g. `--backend` and `--location`.
+## Quick Start
 
-# Config Files
+1. Install dependencies: `poetry install`
+2. Export any secrets used by templated configs (for example `export LDAP_BINDID_PASSWORD=secret` and `export OIDC_CLIENT_SECRET=secret`)
+3. Launch the sample backend so you can see proxied requests: `poetry run uvicorn forevd.app:APP --host 0.0.0.0 --port 8081`
+4. In another shell, run `forevd` against the bundled configs:
 
-You can optionally provide config files for more complicated setups; this section provides soem
-examples, which can be found in the `etc` directory.
+   ```bash
+   poetry run forevd \
+     --debug \
+     --locations @etc/locations.yaml \
+     --ldap @etc/ldap.yaml \
+     --oidc @etc/oidc.yaml \
+     --ssl @etc/ssl.yaml \
+     --var-dir "$(mktemp -d)"
+   ```
 
-The config files use Jinja2 templating via environment variables, so, instead of putting values in
-directly, you can use the form `{{ ENV_VAR_NAME }}` to have the environment varibale injected at
-runtime.
+   Replace the templated values and TLS material with your environment-specific data before pushing to production.
 
-The following command line options support files: `--locations`, `--ldap` or `--oidc`, via the `@`
-symbol, similar to `curl`'s command line option `--data`, for example, `--oidc @etc/oidc.yaml`
+5. Hit the proxy (default `127.0.0.1:8080`) and inspect headers echoed by the FastAPI app to confirm OIDC/mTLS state.
 
-## Locations Config
+## Running `forevd`
 
-This config allows you to provide much more control over each "location" or "endpoint" to your
-reverse proxy. For example, using different backends for different URLs or adding authorization. The
-format of the file is a dictionary of locations, or endpoints, and their correspondign data.
+CLI arguments provided directly (for example `--backend` and `--location`) act as global defaults. Any structured payload supplied to `--locations`, `--ldap`, `--oidc`, or `--ssl` overrides those defaults for the targeted sections. Use `@file.yaml` to point an option at the configs in `etc/` or your own managed files—`forevd` relies on `firestone_lib.cli` helpers to load JSON or YAML transparently.
 
-### Keys
+## Config Files
 
-There are 5 key config options for each location:
+The example files in `etc/` cover common scenarios. They rely on Jinja2 templating so you can inject secrets or host-specific values through environment variables at runtime.
 
-1. `path`: the path, location or endpoint of what to protect or unprotect
-1. `match`: whether the path value is a regex or *match*
-1. `authc`: this is the authentication (aka `authc`) key, representing what authc to enable; this is
-   dictionary with keys being either `mtls` or `oidc`.
-1. `authz`: this is the authorization (aka `authz`) key, representing what authz to enable; this is
-   dictionary with keys, see below example and details at the [Authorization](#authorization)
-    section.
+### Locations Config
 
-Note: remember that global authentication options `--oidc` and `mtls`, so if you want to set OIDC
-across all endpoints, except, say, `/api`, you would need to disable it explicitly with:
+This config controls how each endpoint behaves—backends, authentication, authorization, and HTTP method restrictions. `_nomalize_locations` in `forevd/__main__.py` keeps the data structure consistent before it reaches the Apache template.
+
+| Key | Required | Notes |
+| --- | --- | --- |
+| `path` | Yes | Literal location or regex when combined with `match` |
+| `match` | No | Use `"Match"` to drive `<LocationMatch>` blocks |
+| `backend` | No | Falls back to `--backend` when omitted |
+| `authc` | No | Dict of authn controls (`mtls`, `oidc`) |
+| `authz` | No | Dict of authz controls (LDAP, users, `allow_all`, `join_type`) |
+| `http_methods` | No | List of verbs to protect with `<Limit>` |
+| `set_access_token` | No | Defaults to `true`; controls `Authorization` header injection |
+| `include` | No | Free-form Apache snippet inserted inside the `<Location>` block |
+
+Remember to explicitly disable global auth when a route should opt out:
 
 ```yaml
 - path: /api
@@ -70,12 +91,11 @@ across all endpoints, except, say, `/api`, you would need to disable it explicit
     oidc: false
 ```
 
-### Example
-
-The following adds LDAP group **and** static user authorization to `/`
+#### Example
 
 ```yaml
 - path: /
+  backend: "http://host.docker.internal:8081/"
   authz:
     join_type: "any"
     ldap:
@@ -88,25 +108,17 @@ The following adds LDAP group **and** static user authorization to `/`
       - erick.bourgeois
 ```
 
-Let's break this down a bit:
+- Top-level list items define individual endpoints.
+- `join_type` tells Apache whether any or all authz checks must pass.
+- Environment variables in `{{ ... }}` are resolved at render time.
 
-- the high level keys are endpoints
-- the next level is authorization config
-- the `join_type` key word tells `forevd` how to "combine" or join the two different authorizations,
-  values are:
-  - `any`: if any of the authorization types match, allow connection through
-  - `all`: all of the authorization types **must** match to allow connection through
+### OIDC Config
 
-## OIDC Config
-
-This is useful for adding any other global OIDC config; there are required fields for the auth to
-work, e.g. `ClientID` and `ClientSecret`.
-
-### Example
+Provide client metadata and behavior overrides for `mod_auth_openidc`. Required keys include `ClientId` and `ClientSecret`; optional fields such as `Scope` or `RemoteUserClaim` influence header injection.
 
 ```yaml
 ProviderMetadataUrl: "https://{{ OIDC_PROVIDER_NAME }}.us.auth0.com/.well-known/openid-configuration"
-RedirectURI: "https://erick-pro.jeb.ca:8080/secure/redirect_uri"
+RedirectURI: "https://example.org:8080/secure/redirect_uri"
 ClientId: "{{ OIDC_CLIENT_ID }}"
 ClientSecret: "{{ OIDC_CLIENT_SECRET }}"
 Scope: '"openid profile"'
@@ -114,12 +126,15 @@ PKCEMethod: S256
 RemoteUserClaim: nickname
 ```
 
-## LDAP Config
+Set the following environment variables (or adjust the file) before running:
 
-This is used for global LDAP config, e.g. setting cache information for `mod_ldap`. Note: The `LDAP`
-prefix is stripped, as it's redundant and it's added as part of the config generation.
+- `OIDC_PROVIDER_NAME`
+- `OIDC_CLIENT_ID`
+- `OIDC_CLIENT_SECRET`
 
-### Example
+### LDAP Config
+
+Configure global LDAP caching and connection details consumed by `mod_ldap`. The loader strips the leading `LDAP` prefix automatically.
 
 ```yaml
 SharedCacheSize: 500000
@@ -129,39 +144,73 @@ OpCacheEntries: 1024
 OpCacheTTL: 600
 ```
 
-# Mutual TLS
+### SSL Config
 
-The following command provides termination of mTLS on `/` and passes connections to a backend at
-`http://0.0.0.0:8080`
+`etc/ssl.yaml` demonstrates how to fine-tune TLS without embedding long directives inside the `locations` file. Pass it with `--ssl @etc/ssl.yaml` to override the default Apache cipher settings.
 
+## Mutual TLS
+
+Mutual TLS requires a certificate/key pair and (optionally) a CA bundle. The CLI enforces that `--cert` and `--cert-key` are provided together. You can supply additional SSL settings via `--ssl` as shown below:
+
+```bash
+poetry run forevd \
+  --listen 0.0.0.0:8443 \
+  --backend http://localhost:8081 \
+  --location / \
+  --mtls require \
+  --cert /path/to/server.crt \
+  --cert-key /path/to/server.key \
+  --ca-cert /path/to/ca.pem \
+  --ssl @etc/ssl.yaml \
+  --server-name example.com
 ```
-forevd --debug --listen 0.0.0.0:8080 \
-    --ca-cert $PWD/../certs/ca/ca-cert.pem
-    --cert $PWD/../certs/server.crt
-    --cert-key $PWD/../certs/server.key
-    --backend http://localhost:8081
-    --location /
-    --mtls require
-    --server-name example.com
-    --var-dir /var/tmp/apache
+
+Inside the generated Apache config, mTLS surfaces headers like `X-Remote-User` and `X-SSL-certificate` that your upstream service can consume.
+
+## Authorization
+
+Authorization rules combine LDAP group membership, explicit user allow-lists, and an `allow_all` escape hatch for trusted endpoints. Use `join_type` to control how the checks interact:
+
+```yaml
+authz:
+  join_type: "all"        # require both LDAP and static user match
+  ldap:
+    url: "ldaps://ldap.example.com/DC=example,DC=com"
+    bind-dn: "cn=ldap,dc=example,dc=com"
+    bind-pw: "{{ LDAP_BINDID_PASSWORD }}"
+    groups:
+      - "CN=proxy-users,OU=groups,DC=example,DC=com"
+  users:
+    - alice
+    - bob
 ```
 
-# Authorization
+- `allow_all: true` lets any authenticated user through.
+- Omit the `authz` block entirely for public endpoints (still subject to whatever authn you configured).
+- Keep the structure aligned with the Apache template in `forevd/apache/httpd.conf` when adding new attributes.
 
-To add authorization, it's recommended you use a config file for the `--locations` command line.
+## Logging & Debugging
 
-There is currently support for LDAP group lookups, static user names, or allow all valid users. Here
-are the keys supported:
+- `--debug` raises the root logger and `forevd` namespace to `DEBUG`, and enables verbose tracing for OIDC when configured.
+- Logging defaults originate from `forevd/resources/logging/cli.conf`; extend it there rather than creating ad hoc handlers.
+- Apache access/error logs point to stdout/stderr by default (`--access-log`, `--err-log` override these).
+- Inspect the generated config under `--var-dir` if Apache fails to start; `forevd` will log the path before exec.
 
-1. `allow_all`: this key let's `forevd` know to allow all valid users through
-1. `join_type`: this is the "join" type between all authorizations setup
-  - `any`: if any of the authorization types match, allow connection through
-  - `all`: all of the authorization types **must** match to allow connection through
-1. `ldap`: this is the LDAP configuration for group lookups, keys are:
-   - `url`: LDAP URL, e.g. `ldaps://127.0.0.1/DC=foo,DC=example,DC=com`
-   - `bind-dn`: the DN for bind operation
-   - `bind-pw`: the password for bind operation
-   - `groups`: a list of groups DNs
-1. `users`: a list of user names to verify against
+## Project Structure
 
-See [Locations Example](#example) for more detail.
+- `forevd/__main__.py` – CLI entry point, option validation, location normalization, backend dispatch.
+- `forevd/apache/` – Jinja2 template and backend launcher that writes `httpd.conf` and `execve`s `httpd`.
+- `forevd/app.py` – Minimal FastAPI app that echoes request headers for smoke testing.
+- `etc/` – Sample configs demonstrating multi-location setups, LDAP/SSL/OIDC tuning.
+- `forevd/resources/logging/` – Logging configuration consumed during CLI initialization.
+
+## Contributing & Testing
+
+- Format and lint with the configured toolchain (`black`, `pylint`, `pycodestyle`) as needed.
+- Run unit tests via `poetry run pytest`; add coverage when modifying behavior or templates.
+- Keep `pyproject.toml` and `poetry.lock` in sync if you change dependencies.
+- Align coding style with `.github/instructions/` (Python and YAML guidelines).
+
+## License
+
+`forevd` is released under the terms of the [LICENSE](LICENSE) file in this repository.
