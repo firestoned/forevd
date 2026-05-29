@@ -7,7 +7,7 @@ license = "LICENSE"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
+python = ">=3.9,<3.14"
 Jinja2 = ">=3.1.2"
 requests = ">=2.28.1"
 firestone-lib = ">=0.1.8"
