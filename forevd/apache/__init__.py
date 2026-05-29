@@ -12,6 +12,29 @@ import jinja2
 
 _LOGGER = logging.getLogger(__name__)
 
+_HTTPD_CANDIDATES = (
+    "/usr/local/apache2/bin/httpd",
+    "/usr/sbin/httpd",
+    "/usr/sbin/apache2",
+)
+
+
+def _find_httpd() -> str:
+    """Find Apache in common package and container locations."""
+    httpd = shutil.which("httpd")
+    if httpd:
+        return httpd
+
+    for candidate in _HTTPD_CANDIDATES:
+        if os.path.exists(candidate):
+            return candidate
+
+    raise RuntimeError("Unable to find Apache httpd. Use --cmd to provide its path.")
+
+
+def _server_root(httpd: str) -> str:
+    return os.environ.get("FOREVD_HTTPD_ROOT", os.path.dirname(os.path.dirname(httpd)))
+
 
 def run(var_dir: str, config: dict, do_exec: bool, cmd: str = None):
     """Execute Apache given the config."""
@@ -39,7 +62,7 @@ def run(var_dir: str, config: dict, do_exec: bool, cmd: str = None):
 
     _LOGGER.debug(f"cmd: {cmd!r}")
     if not cmd:
-        httpd = shutil.which("httpd")
+        httpd = _find_httpd()
         _LOGGER.debug(f"httpd: {httpd}")
 
         cmd = [
@@ -49,7 +72,7 @@ def run(var_dir: str, config: dict, do_exec: bool, cmd: str = None):
             "-f",
             config_file,
             "-d",
-            "/opt/homebrew/Cellar/httpd/2.4.55/lib/httpd",
+            _server_root(httpd),
         ]
     else:
         cmd = shlex.split(cmd)
