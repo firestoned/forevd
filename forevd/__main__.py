@@ -15,6 +15,7 @@ _DEFAULT_ERRLOG = "/dev/stderr"
 _DEFAULT_ACCESSLOG = "/dev/stdout"
 
 _DEFAULT_LISTEN = "127.0.0.1:8080"
+_DEFAULT_TIMEOUT = 10
 _DEFAULT_HOSTNAME = os.environ.get("HOSTNAME", "localhost")
 
 _DEFAULT_VAR_DIR = os.path.join(tempfile.mkdtemp(), "forevd")
@@ -205,6 +206,14 @@ def _nomalize_locations(
     type=cli.FromJsonOrYaml(),
 )
 @click.option(
+    "--timeout",
+    help="Apache request timeout in seconds",
+    type=int,
+    default=_DEFAULT_TIMEOUT,
+    show_default=True,
+    envvar="FOREVD_TIMEOUT",
+)
+@click.option(
     "--var-dir",
     help="The backend of this reverse proxy will front, e.g. http://localhost:8080/foo",
     type=click.Path(),
@@ -234,6 +243,7 @@ def main(
     server_name,
     set_access_token,
     ssl,
+    timeout,
     var_dir,
 ):
     """forevd is a forward/reverse proxy, primarily used as a sidecar for REST or any HTTP/s apps."""
@@ -261,6 +271,7 @@ def main(
         "oidc": oidc,
         "ssl": ssl,
         "server_name": server_name,
+        "timeout": timeout,
     }
     _LOGGER.debug(f"config: {config}")
 
